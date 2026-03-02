@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagrama Entidad-Relación — ZapatoFlex SAS</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface-2: #1a2237;
+    --border: #1e2a42;
+    --border-light: #2a3a5c;
+    --text: #e2e8f0;
+    --text-dim: #8892a8;
+    --text-muted: #4a5568;
+    --security: #6366f1;
+    --security-bg: rgba(99,102,241,0.08);
+    --security-border: rgba(99,102,241,0.25);
+    --logic: #10b981;
+    --logic-bg: rgba(16,185,129,0.08);
+    --logic-border: rgba(16,185,129,0.25);
+    --pk: #f59e0b;
+    --fk: #06b6d4;
+    --unique: #a78bfa;
+    --relation: #475569;
+    --accent: #f472b6;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  #canvas-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    cursor: grab;
+  }
+  #canvas-container:active { cursor: grabbing; }
+
+  #canvas {
+    position: absolute;
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+
+  /* Header overlay */
+  .header-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: linear-gradient(to bottom, rgba(10,14,26,0.95) 0%, rgba(10,14,26,0.7) 70%, transparent 100%);
+    padding: 16px 24px 32px;
+    pointer-events: none;
+  }
+  .header-overlay > * { pointer-events: auto; }
+  .header-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .header-title span { color: var(--security); }
+  .header-subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Legend */
+  .legend {
+    position: fixed;
+    bottom: 16px; left: 16px;
+    z-index: 100;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    display: flex;
+    gap: 20px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-dim); }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .legend-line {
+    width: 20px; height: 2px; border-radius: 1px;
+  }
+
+  /* Zoom controls */
+  .zoom-controls {
+    position: fixed;
+    bottom: 16px; right: 16px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .zoom-btn {
+    width: 36px; height: 36px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .zoom-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--border-light); }
+
+  /* Entity table */
+  .entity {
+    position: absolute;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    min-width: 200px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    transition: box-shadow 0.3s, border-color 0.3s;
+    overflow: hidden;
+  }
+  .entity:hover {
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    border-color: var(--border-light);
+  }
+  .entity.schema-security { border-top: 2px solid var(--security); }
+  .entity.schema-logic { border-top: 2px solid var(--logic); }
+
+  .entity-header {
+    padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .schema-security .entity-header { background: var(--security-bg); color: var(--security); }
+  .schema-logic .entity-header { background: var(--logic-bg); color: var(--logic); }
+
+  .entity-header .schema-tag {
+    font-size: 8px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+  .schema-security .schema-tag { background: var(--security-border); }
+  .schema-logic .schema-tag { background: var(--logic-border); }
+
+  .entity-body { padding: 6px 0; }
+
+  .entity-row {
+    display: grid;
+    grid-template-columns: 30px 1fr 1fr;
+    padding: 3px 14px;
+    font-size: 11px;
+    align-items: center;
+    transition: background 0.15s;
+  }
+  .entity-row:hover { background: rgba(255,255,255,0.02); }
+
+  .col-icon {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    display: flex; gap: 2px;
+  }
+  .badge-pk { color: var(--pk); }
+  .badge-fk { color: var(--fk); }
+  .badge-uq { color: var(--unique); }
+
+  .col-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    color: var(--text);
+    font-size: 11px;
+  }
+  .col-name.is-pk { color: var(--pk); }
+  .col-name.is-fk { color: var(--fk); }
+
+  .col-type {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    font-size: 10px;
+    text-align: right;
+  }
+
+  .entity-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 14px;
+  }
+
+  /* SVG lines */
+  svg.relations {
+    position: absolute;
+    top: 0; left: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+  svg.relations line {
+    stroke: var(--relation);
+    stroke-width: 1.2;
+    opacity: 0.4;
+  }
+  svg.relations .rel-highlight {
+    stroke: var(--fk);
+    opacity: 0.6;
+    stroke-width: 1.5;
+  }
+  svg.relations text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    fill: var(--text-muted);
+  }
+  svg.relations circle {
+    fill: var(--relation);
+    opacity: 0.5;
+  }
+
+  /* Schema group backgrounds */
+  .schema-group {
+    position: absolute;
+    border-radius: 16px;
+    border: 1px dashed;
+    opacity: 0.3;
+  }
+  .schema-group.security-group {
+    border-color: var(--security);
+    background: var(--security-bg);
+  }
+  .schema-group.logic-group {
+    border-color: var(--logic);
+    background: var(--logic-bg);
+  }
+  .schema-group-label {
+    position: absolute;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 6px;
+    top: -14px;
+    left: 20px;
+  }
+  .security-group .schema-group-label {
+    color: var(--security);
+    background: var(--bg);
+  }
+  .logic-group .schema-group-label {
+    color: var(--logic);
+    background: var(--bg);
+  }
+
+  /* Cardinality markers */
+  .card-marker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<div class="header-overlay">
+  <div class="header-title"><span>◆</span> Diagrama Entidad-Relación — ZapatoFlex SAS</div>
+  <div class="header-subtitle">PostgreSQL 15+ &nbsp;│&nbsp; Schemas: security + logic &nbsp;│&nbsp; Scroll para zoom · Arrastra para mover</div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--security)"></div> security</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--logic)"></div> logic</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--pk)"></div> PK</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--fk)"></div> FK</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--unique)"></div> UQ</div>
+  <div class="legend-item"><div class="legend-line" style="background:var(--relation)"></div> Relación</div>
+</div>
+
+<div class="zoom-controls">
+  <button class="zoom-btn" onclick="zoomIn()">+</button>
+  <button class="zoom-btn" onclick="zoomOut()">−</button>
+  <button class="zoom-btn" onclick="resetView()" style="font-size:12px">⟲</button>
+</div>
+
+<div id="canvas-container">
+  <div id="canvas"></div>
+</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────
+
+const entities = {
+  // SECURITY SCHEMA
+  rol: {
+    schema: 'security', x: 120, y: 60,
+    columns: [
+      { name: 'id_rol', type: 'SERIAL', pk: true },
+      { name: 'nombre', type: 'TEXT', unique: true },
+      { name: 'comentario', type: 'TEXT' },
+      { name: 'deleted_at', type: 'TIMESTAMP' },
+    ]
+  },
+  menu: {
+    schema: 'security', x: 120, y: 260,
+    columns: [
+      { name: 'id_menu', type: 'SERIAL', pk: true },
+      { name: 'nombre', type: 'TEXT' },
+      { name: 'ruta', type: 'TEXT' },
+      { name: 'deleted_at', type: 'TIMESTAMP' },
+    ]
+  },
+  menurol: {
+    schema: 'security', x: 120, y: 450,
+    columns: [
+      { name: 'id_menu_rol', type: 'SERIAL', pk: true },
+      { name: 'rolid', type: 'INT', fk: true },
+      { name: 'menuid', type: 'INT', fk: true },
+      { name: 'abrir', type: 'BOOLEAN' },
+      { name: 'guardar', type: 'BOOLEAN' },
+      { name: 'editar', type: 'BOOLEAN' },
+      { name: 'eliminar', type: 'BOOLEAN' },
+    ]
+  },
+  usuario: {
+    schema: 'security', x: 420, y: 60,
+    columns: [
+      { name: 'id_usuario', type: 'SERIAL', pk: true },
+      { name: 'username', type: 'TEXT', unique: true },
+      { name: 'nombre', type: 'TEXT' },
+      { name: 'clave', type: 'TEXT' },
+      { name: 'rolid', type: 'INT', fk: true },
+      { name: 'created_at', type: 'TIMESTAMP' },
+      { name: 'deleted_at', type: 'TIMESTAMP' },
+    ]
+  },
+  login: {
+    schema: 'security', x: 420, y: 340,
+    columns: [
+      { name: 'id_login', type: 'SERIAL', pk: true },
+      { name: 'token', type: 'TEXT' },
+      { name: 'refresh_token', type: 'TEXT' },
+      { name: 'estado_token', type: 'BOOLEAN' },
+      { name: 'usuarioid', type: 'INT', fk: true },
+      { name: 'ip_origen', type: 'INET' },
+      { name: 'refresh_expira', type: 'TIMESTAMP' },
+    ]
+  },
+
+  // LOGIC SCHEMA
+  categoria: {
+    schema: 'logic', x: 750, y: 60,
+    columns: [
+      { name: 'id_categoria', type: 'SERIAL', pk: true },
+      { name: 'nombre', type: 'TEXT', unique: true },
+    ]
+  },
+  marca: {
+    schema: 'logic', x: 960, y: 60,
+    columns: [
+      { name: 'id_marca', type: 'SERIAL', pk: true },
+      { name: 'nombre', type: 'TEXT', unique: true },
+    ]
+  },
+  producto: {
+    schema: 'logic', x: 840, y: 210,
+    columns: [
+      { name: 'id_producto', type: 'SERIAL', pk: true },
+      { name: 'nombre', type: 'TEXT' },
+      { name: 'descripcion', type: 'TEXT' },
+      { name: 'id_categoria', type: 'INT', fk: true },
+      { name: 'id_marca', type: 'INT', fk: true },
+      { name: 'activo', type: 'BOOLEAN' },
+      { name: 'created_at', type: 'TIMESTAMP' },
+    ]
+  },
+  talla: {
+    schema: 'logic', x: 750, y: 430,
+    columns: [
+      { name: 'id_talla', type: 'SERIAL', pk: true },
+      { name: 'valor', type: 'TEXT', unique: true },
+    ]
+  },
+  color: {
+    schema: 'logic', x: 960, y: 430,
+    columns: [
+      { name: 'id_color', type: 'SERIAL', pk: true },
+      { name: 'nombre', type: 'TEXT', unique: true },
+      { name: 'hex', type: 'CHAR(7)' },
+    ]
+  },
+  producto_variante: {
+    schema: 'logic', x: 840, y: 560,
+    columns: [
+      { name: 'id_variante', type: 'SERIAL', pk: true },
+      { name: 'id_producto', type: 'INT', fk: true },
+      { name: 'id_talla', type: 'INT', fk: true },
+      { name: 'id_color', type: 'INT', fk: true },
+      { name: 'sku', type: 'TEXT', unique: true },
+      { name: 'precio', type: 'NUMERIC(12,2)' },
+      { name: 'activo', type: 'BOOLEAN' },
+    ]
+  },
+  inventario: {
+    schema: 'logic', x: 750, y: 790,
+    columns: [
+      { name: 'id_variante', type: 'INT', pk: true, fk: true },
+      { name: 'stock', type: 'INT' },
+      { name: 'updated_at', type: 'TIMESTAMP' },
+    ]
+  },
+  inventario_motivo: {
+    schema: 'logic', x: 1120, y: 710,
+    columns: [
+      { name: 'id_motivo', type: 'SMALLSERIAL', pk: true },
+      { name: 'codigo', type: 'TEXT', unique: true },
+      { name: 'descripcion', type: 'TEXT' },
+    ]
+  },
+  inventario_mov: {
+    schema: 'logic', x: 1120, y: 870,
+    columns: [
+      { name: 'id_mov', type: 'SERIAL', pk: true },
+      { name: 'id_variante', type: 'INT', fk: true },
+      { name: 'id_motivo', type: 'INT', fk: true },
+      { name: 'delta', type: 'INT' },
+      { name: 'ref', type: 'TEXT' },
+      { name: 'created_at', type: 'TIMESTAMP' },
+    ]
+  },
+  carrito: {
+    schema: 'logic', x: 1340, y: 60,
+    columns: [
+      { name: 'id_carrito', type: 'SERIAL', pk: true },
+      { name: 'id_usuario', type: 'INT', fk: true },
+      { name: 'abierto', type: 'BOOLEAN' },
+      { name: 'created_at', type: 'TIMESTAMP' },
+    ]
+  },
+  carrito_item: {
+    schema: 'logic', x: 1340, y: 250,
+    columns: [
+      { name: 'id_carrito', type: 'INT', pk: true, fk: true },
+      { name: 'id_variante', type: 'INT', pk: true, fk: true },
+      { name: 'cantidad', type: 'INT' },
+    ]
+  },
+  pedido_estado: {
+    schema: 'logic', x: 1580, y: 60,
+    columns: [
+      { name: 'id_estado', type: 'SMALLSERIAL', pk: true },
+      { name: 'codigo', type: 'TEXT', unique: true },
+    ]
+  },
+  pedido: {
+    schema: 'logic', x: 1580, y: 230,
+    columns: [
+      { name: 'id_pedido', type: 'SERIAL', pk: true },
+      { name: 'id_usuario', type: 'INT', fk: true },
+      { name: 'id_estado', type: 'INT', fk: true },
+      { name: 'total', type: 'NUMERIC(12,2)' },
+      { name: 'created_at', type: 'TIMESTAMP' },
+    ]
+  },
+  pedido_item: {
+    schema: 'logic', x: 1580, y: 460,
+    columns: [
+      { name: 'id_pedido', type: 'INT', pk: true, fk: true },
+      { name: 'id_variante', type: 'INT', pk: true, fk: true },
+      { name: 'cantidad', type: 'INT' },
+      { name: 'precio_unit', type: 'NUMERIC(12,2)' },
+    ]
+  },
+  pago_estado: {
+    schema: 'logic', x: 1830, y: 60,
+    columns: [
+      { name: 'id_estado', type: 'SMALLSERIAL', pk: true },
+      { name: 'codigo', type: 'TEXT', unique: true },
+    ]
+  },
+  pago: {
+    schema: 'logic', x: 1830, y: 260,
+    columns: [
+      { name: 'id_pago', type: 'SERIAL', pk: true },
+      { name: 'id_pedido', type: 'INT', fk: true, unique: true },
+      { name: 'contraentrega', type: 'BOOLEAN' },
+      { name: 'id_estado', type: 'INT', fk: true },
+      { name: 'created_at', type: 'TIMESTAMP' },
+    ]
+  },
+};
+
+const relations = [
+  // security
+  { from: 'usuario', to: 'rol', label: 'tiene', card: 'N:1' },
+  { from: 'login', to: 'usuario', label: 'genera', card: 'N:1' },
+  { from: 'menurol', to: 'rol', label: 'asigna', card: 'N:1' },
+  { from: 'menurol', to: 'menu', label: 'sobre', card: 'N:1' },
+  // logic - productos
+  { from: 'producto', to: 'categoria', label: 'clasifica', card: 'N:1' },
+  { from: 'producto', to: 'marca', label: 'pertenece', card: 'N:1' },
+  { from: 'producto_variante', to: 'producto', label: 'tiene', card: 'N:1' },
+  { from: 'producto_variante', to: 'talla', label: 'define', card: 'N:1' },
+  { from: 'producto_variante', to: 'color', label: 'define', card: 'N:1' },
+  // inventario
+  { from: 'inventario', to: 'producto_variante', label: '1:1', card: '1:1' },
+  { from: 'inventario_mov', to: 'producto_variante', label: 'ref', card: 'N:1' },
+  { from: 'inventario_mov', to: 'inventario_motivo', label: 'tipo', card: 'N:1' },
+  // carrito
+  { from: 'carrito', to: 'usuario', label: 'posee', card: 'N:1', cross: true },
+  { from: 'carrito_item', to: 'carrito', label: 'contiene', card: 'N:1' },
+  { from: 'carrito_item', to: 'producto_variante', label: 'ref', card: 'N:1' },
+  // pedidos
+  { from: 'pedido', to: 'usuario', label: 'realiza', card: 'N:1', cross: true },
+  { from: 'pedido', to: 'pedido_estado', label: 'estado', card: 'N:1' },
+  { from: 'pedido_item', to: 'pedido', label: 'items', card: 'N:1' },
+  { from: 'pedido_item', to: 'producto_variante', label: 'ref', card: 'N:1' },
+  // pagos
+  { from: 'pago', to: 'pedido', label: '1:1', card: '1:1' },
+  { from: 'pago', to: 'pago_estado', label: 'estado', card: 'N:1' },
+];
+
+
+// ─── RENDER ─────────────────────────────────────────────
+
+const canvas = document.getElementById('canvas');
+const container = document.getElementById('canvas-container');
+
+// Build entities
+const entityElements = {};
+const ROW_H = 22;
+const HEADER_H = 36;
+const PAD_BOTTOM = 10;
+
+for (const [key, ent] of Object.entries(entities)) {
+  const el = document.createElement('div');
+  el.className = `entity schema-${ent.schema}`;
+  el.style.left = ent.x + 'px';
+  el.style.top = ent.y + 'px';
+  el.id = 'entity-' + key;
+
+  let html = `<div class="entity-header">
+    <span class="schema-tag">${ent.schema}</span>
+    ${key.toUpperCase()}
+  </div><div class="entity-body">`;
+
+  const pks = ent.columns.filter(c => c.pk);
+  const others = ent.columns.filter(c => !c.pk);
+
+  for (const col of pks) {
+    html += renderRow(col);
+  }
+  if (pks.length > 0 && others.length > 0) {
+    html += '<div class="entity-separator"></div>';
+  }
+  for (const col of others) {
+    html += renderRow(col);
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+  canvas.appendChild(el);
+  entityElements[key] = el;
+}
+
+function renderRow(col) {
+  let badges = '';
+  let nameClass = 'col-name';
+  if (col.pk) { badges += '<span class="badge-pk">PK</span>'; nameClass += ' is-pk'; }
+  if (col.fk) { badges += '<span class="badge-fk">FK</span>'; nameClass += ' is-fk'; }
+  if (col.unique && !col.pk) badges += '<span class="badge-uq">UQ</span>';
+
+  return `<div class="entity-row">
+    <div class="col-icon">${badges}</div>
+    <div class="${nameClass}">${col.name}</div>
+    <div class="col-type">${col.type}</div>
+  </div>`;
+}
+
+// Schema group backgrounds
+function addSchemaGroup(schema, x, y, w, h) {
+  const g = document.createElement('div');
+  g.className = `schema-group ${schema}-group`;
+  g.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px;`;
+  g.innerHTML = `<div class="schema-group-label">${schema}</div>`;
+  canvas.insertBefore(g, canvas.firstChild);
+}
+
+addSchemaGroup('security', 80, 20, 600, 640);
+addSchemaGroup('logic', 710, 20, 1190, 1000);
+
+// Draw relations SVG
+const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+svg.classList.add('relations');
+svg.setAttribute('width', '2200');
+svg.setAttribute('height', '1200');
+canvas.insertBefore(svg, canvas.firstChild);
+
+function getEntityCenter(key) {
+  const el = entityElements[key];
+  const rect = { x: parseInt(el.style.left), y: parseInt(el.style.top), w: el.offsetWidth, h: el.offsetHeight };
+  return { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2, ...rect };
+}
+
+function getConnectionPoints(fromKey, toKey) {
+  const f = getEntityCenter(fromKey);
+  const t = getEntityCenter(toKey);
+
+  // Find best edge to connect
+  let fx, fy, tx, ty;
+  const dx = t.x - f.x;
+  const dy = t.y - f.y;
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    // Horizontal dominant
+    if (dx > 0) {
+      fx = f.x + f.w; tx = t.x;
+    } else {
+      fx = f.x; tx = t.x + t.w;
+    }
+    fy = f.y + f.h / 2;
+    ty = t.y + t.h / 2;
+  } else {
+    // Vertical dominant
+    if (dy > 0) {
+      fy = f.y + f.h; ty = t.y;
+    } else {
+      fy = f.y; ty = t.y + t.h;
+    }
+    fx = f.x + f.w / 2;
+    tx = t.x + t.w / 2;
+  }
+
+  return { fx, fy, tx, ty };
+}
+
+// Delay rendering lines so entities have dimensions
+setTimeout(() => {
+  for (const rel of relations) {
+    const pts = getConnectionPoints(rel.from, rel.to);
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', pts.fx);
+    line.setAttribute('y1', pts.fy);
+    line.setAttribute('x2', pts.tx);
+    line.setAttribute('y2', pts.ty);
+    if (rel.cross) line.classList.add('rel-highlight');
+    svg.appendChild(line);
+
+    // Dots at endpoints
+    for (const [cx, cy] of [[pts.fx, pts.fy], [pts.tx, pts.ty]]) {
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      c.setAttribute('cx', cx);
+      c.setAttribute('cy', cy);
+      c.setAttribute('r', 3);
+      if (rel.cross) c.style.fill = 'var(--fk)';
+      svg.appendChild(c);
+    }
+
+    // Label
+    const mx = (pts.fx + pts.tx) / 2;
+    const my = (pts.fy + pts.ty) / 2;
+    const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    txt.setAttribute('x', mx + 4);
+    txt.setAttribute('y', my - 5);
+    txt.textContent = rel.label;
+    svg.appendChild(txt);
+
+    // Cardinality
+    if (rel.card) {
+      const parts = rel.card.split(':');
+      const ct1 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      ct1.setAttribute('x', pts.fx + (pts.tx > pts.fx ? 8 : -14));
+      ct1.setAttribute('y', pts.fy + (pts.ty > pts.fy ? 14 : -6));
+      ct1.classList.add('card-marker');
+      ct1.textContent = parts[0] === 'N' ? '∗' : '1';
+      svg.appendChild(ct1);
+
+      const ct2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      ct2.setAttribute('x', pts.tx + (pts.fx > pts.tx ? 8 : -14));
+      ct2.setAttribute('y', pts.ty + (pts.fy > pts.ty ? 14 : -6));
+      ct2.classList.add('card-marker');
+      ct2.textContent = parts[1] === 'N' ? '∗' : '1';
+      svg.appendChild(ct2);
+    }
+  }
+}, 100);
+
+
+// ─── PAN & ZOOM ─────────────────────────────────────────
+
+let scale = 0.85;
+let panX = 40, panY = 60;
+let isPanning = false;
+let startX, startY;
+
+function updateTransform() {
+  canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+}
+updateTransform();
+
+container.addEventListener('mousedown', e => {
+  isPanning = true;
+  startX = e.clientX - panX;
+  startY = e.clientY - panY;
+});
+container.addEventListener('mousemove', e => {
+  if (!isPanning) return;
+  panX = e.clientX - startX;
+  panY = e.clientY - startY;
+  updateTransform();
+});
+container.addEventListener('mouseup', () => isPanning = false);
+container.addEventListener('mouseleave', () => isPanning = false);
+
+container.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.06 : 0.06;
+  scale = Math.min(2, Math.max(0.3, scale + delta));
+  updateTransform();
+}, { passive: false });
+
+// Touch support
+let lastTouchDist = 0;
+container.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isPanning = true;
+    startX = e.touches[0].clientX - panX;
+    startY = e.touches[0].clientY - panY;
+  } else if (e.touches.length === 2) {
+    lastTouchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  }
+});
+container.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && isPanning) {
+    panX = e.touches[0].clientX - startX;
+    panY = e.touches[0].clientY - startY;
+    updateTransform();
+  } else if (e.touches.length === 2) {
+    const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    const delta = (dist - lastTouchDist) * 0.003;
+    scale = Math.min(2, Math.max(0.3, scale + delta));
+    lastTouchDist = dist;
+    updateTransform();
+  }
+}, { passive: false });
+container.addEventListener('touchend', () => isPanning = false);
+
+function zoomIn() { scale = Math.min(2, scale + 0.15); updateTransform(); }
+function zoomOut() { scale = Math.max(0.3, scale - 0.15); updateTransform(); }
+function resetView() { scale = 0.85; panX = 40; panY = 60; updateTransform(); }
+</script>
+</body>
+</html>
